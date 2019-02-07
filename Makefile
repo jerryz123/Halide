@@ -103,6 +103,7 @@ WITH_X86 ?= $(findstring x86, $(LLVM_COMPONENTS))
 WITH_ARM ?= $(findstring arm, $(LLVM_COMPONENTS))
 WITH_HEXAGON ?= $(findstring hexagon, $(LLVM_COMPONENTS))
 WITH_MIPS ?= $(findstring mips, $(LLVM_COMPONENTS))
+WITH_RISCV ?= $(findstring riscv, $(LLVM_COMPONENTS))
 WITH_AARCH64 ?= $(findstring aarch64, $(LLVM_COMPONENTS))
 WITH_POWERPC ?= $(findstring powerpc, $(LLVM_COMPONENTS))
 WITH_PTX ?= $(findstring nvptx, $(LLVM_COMPONENTS))
@@ -135,6 +136,10 @@ MIPS_LLVM_CONFIG_LIB=$(if $(WITH_MIPS), mips, )
 
 POWERPC_CXX_FLAGS=$(if $(WITH_POWERPC), -DWITH_POWERPC=1, )
 POWERPC_LLVM_CONFIG_LIB=$(if $(WITH_POWERPC), powerpc, )
+
+RISCV_CXX_FLAGS=$(if $(WITH_RISCV), -DWITH_RISCV=1, )
+RISCV_LLVM_CONFIG_LIB=$(if $(WITH_RISCV), riscv, )
+
 
 PTX_CXX_FLAGS=$(if $(WITH_PTX), -DWITH_PTX=1, )
 PTX_LLVM_CONFIG_LIB=$(if $(WITH_PTX), nvptx, )
@@ -190,6 +195,7 @@ CXX_FLAGS += $(METAL_CXX_FLAGS)
 CXX_FLAGS += $(OPENGL_CXX_FLAGS)
 CXX_FLAGS += $(D3D12_CXX_FLAGS)
 CXX_FLAGS += $(MIPS_CXX_FLAGS)
+CXX_FLAGS += $(RISCV_CXX_FLAGS)
 CXX_FLAGS += $(POWERPC_CXX_FLAGS)
 CXX_FLAGS += $(INTROSPECTION_CXX_FLAGS)
 CXX_FLAGS += $(EXCEPTIONS_CXX_FLAGS)
@@ -203,7 +209,7 @@ CXX_FLAGS += -funwind-tables
 print-%:
 	@echo '$*=$($*)'
 
-LLVM_STATIC_LIBS = -L $(LLVM_LIBDIR) $(shell $(LLVM_CONFIG) --link-static --libfiles bitwriter bitreader linker ipo mcjit $(X86_LLVM_CONFIG_LIB) $(ARM_LLVM_CONFIG_LIB) $(OPENCL_LLVM_CONFIG_LIB) $(METAL_LLVM_CONFIG_LIB) $(PTX_LLVM_CONFIG_LIB) $(AARCH64_LLVM_CONFIG_LIB) $(MIPS_LLVM_CONFIG_LIB) $(POWERPC_LLVM_CONFIG_LIB) $(HEXAGON_LLVM_CONFIG_LIB) $(AMDGPU_LLVM_CONFIG_LIB))
+LLVM_STATIC_LIBS = -L $(LLVM_LIBDIR) $(shell $(LLVM_CONFIG) --link-static --libfiles bitwriter bitreader linker ipo mcjit $(X86_LLVM_CONFIG_LIB) $(ARM_LLVM_CONFIG_LIB) $(OPENCL_LLVM_CONFIG_LIB) $(METAL_LLVM_CONFIG_LIB) $(PTX_LLVM_CONFIG_LIB) $(AARCH64_LLVM_CONFIG_LIB) $(MIPS_LLVM_CONFIG_LIB) $(POWERPC_LLVM_CONFIG_LIB) $(RISCV_LLVM_CONFIG_LIB) $(HEXAGON_LLVM_CONFIG_LIB) $(AMDGPU_LLVM_CONFIG_LIB))
 
 # Add a rpath to the llvm used for linking, in case multiple llvms are
 # installed. Bakes a path on the build system into the .so, so don't
@@ -389,6 +395,7 @@ SOURCE_FILES = \
   CodeGen_OpenGLCompute_Dev.cpp \
   CodeGen_Posix.cpp \
   CodeGen_PowerPC.cpp \
+  CodeGen_RISCV.cpp \
   CodeGen_PTX_Dev.cpp \
   CodeGen_X86.cpp \
   CPlusPlusMangle.cpp \
@@ -551,6 +558,7 @@ HEADER_FILES = \
   CodeGen_Posix.h \
   CodeGen_PowerPC.h \
   CodeGen_PTX_Dev.h \
+  CodeGen_RISCV.h \
   CodeGen_X86.h \
   ConciseCasts.h \
   CPlusPlusMangle.h \
@@ -749,6 +757,7 @@ RUNTIME_CPP_COMPONENTS = \
   qurt_threads \
   qurt_threads_tsan \
   qurt_yield \
+  riscv_cpu_features \
   runtime_api \
   ssp \
   to_string \
@@ -777,6 +786,7 @@ RUNTIME_LL_COMPONENTS = \
   mips \
   posix_math \
   powerpc \
+  riscv \
   ptx_dev \
   win32_math \
   x86 \

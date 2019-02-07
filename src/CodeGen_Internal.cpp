@@ -458,7 +458,11 @@ std::unique_ptr<llvm::TargetMachine> make_target_machine(const llvm::Module &mod
     return std::unique_ptr<llvm::TargetMachine>(llvm_target->createTargetMachine(module.getTargetTriple(),
                                                 mcpu, mattrs,
                                                 options,
+#ifdef WITH_RISCV
+                                                llvm::Reloc::Static,
+#else
                                                 llvm::Reloc::PIC_,
+#endif
 #ifdef HALIDE_USE_CODEMODEL_LARGE
                                                 llvm::CodeModel::Large,
 #else

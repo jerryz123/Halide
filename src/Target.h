@@ -32,6 +32,7 @@ struct Target {
         X86,
         ARM,
         MIPS,
+        RISCV,
         Hexagon,
         POWERPC,
     } arch;
