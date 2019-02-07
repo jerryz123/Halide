@@ -81,6 +81,9 @@ Target calculate_host_target() {
 #if defined(__arm__) || defined(__aarch64__)
     Target::Arch arch = Target::ARM;
 #else
+#if defined(__riscv__)
+    Target::Arch arch = Target::RISCV;
+#else
 #if defined(__powerpc__) && defined(__linux__)
     Target::Arch arch = Target::POWERPC;
 
@@ -162,6 +165,7 @@ Target calculate_host_target() {
 #endif
 #endif
 
+#endif
 #endif
 #endif
 #endif
@@ -285,6 +289,7 @@ const std::map<std::string, Target::Arch> arch_name_map = {
     {"x86", Target::X86},
     {"arm", Target::ARM},
     {"mips", Target::MIPS},
+    {"riscv", Target::RISCV},
     {"powerpc", Target::POWERPC},
     {"hexagon", Target::Hexagon},
     {"wasm", Target::WebAssembly},

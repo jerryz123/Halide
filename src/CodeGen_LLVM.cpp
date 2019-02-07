@@ -11,6 +11,7 @@
 #include "CodeGen_Internal.h"
 #include "CodeGen_LLVM.h"
 #include "CodeGen_MIPS.h"
+#include "CodeGen_RISCV.h"
 #include "CodeGen_PowerPC.h"
 #include "CodeGen_WebAssembly.h"
 #include "CodeGen_X86.h"
@@ -120,6 +121,12 @@ using std::vector;
 #define InitializeMipsTarget()       InitializeTarget(Mips)
 #define InitializeMipsAsmParser()    InitializeAsmParser(Mips)
 #define InitializeMipsAsmPrinter()   InitializeAsmPrinter(Mips)
+#endif
+
+#ifdef WITH_RISCV
+#define InitializeRISCVTarget()       InitializeTarget(RISCV)
+#define InitializeRISCVAsmParser()    InitializeAsmParser(RISCV)
+#define InitializeRISCVAsmPrinter()   InitializeAsmPrinter(RISCV)
 #endif
 
 #ifdef WITH_POWERPC
@@ -332,6 +339,8 @@ CodeGen_LLVM *CodeGen_LLVM::new_for_target(const Target &target,
         return make_codegen<CodeGen_ARM>(target, context);
     } else if (target.arch == Target::MIPS) {
         return make_codegen<CodeGen_MIPS>(target, context);
+    } else if (target.arch == Target::RISCV) {
+        return make_codegen<CodeGen_RISCV>(target, context);
     } else if (target.arch == Target::POWERPC) {
         return make_codegen<CodeGen_PowerPC>(target, context);
     } else if (target.arch == Target::Hexagon) {
@@ -460,6 +469,7 @@ bool CodeGen_LLVM::llvm_Hexagon_enabled = false;
 bool CodeGen_LLVM::llvm_AArch64_enabled = false;
 bool CodeGen_LLVM::llvm_NVPTX_enabled = false;
 bool CodeGen_LLVM::llvm_Mips_enabled = false;
+bool CodeGen_LLVM::llvm_RISCV_enabled = false;
 bool CodeGen_LLVM::llvm_PowerPC_enabled = false;
 bool CodeGen_LLVM::llvm_AMDGPU_enabled = false;
 bool CodeGen_LLVM::llvm_WebAssembly_enabled = false;

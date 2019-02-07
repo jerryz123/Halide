@@ -84,6 +84,7 @@ set(RUNTIME_CPP
   qurt_threads
   qurt_threads_tsan
   qurt_yield
+  riscv_cpu_features
   runtime_api
   ssp
   to_string
@@ -111,6 +112,7 @@ set (RUNTIME_LL
   hvx_64
   hvx_128
   mips
+  riscv
   posix_math
   powerpc
   ptx_dev
@@ -302,6 +304,7 @@ set(HEADER_FILES
   CodeGen_PowerPC.h
   CodeGen_PTX_Dev.h
   CodeGen_WebAssembly.h
+  CodeGen_RISCV.h
   CodeGen_X86.h
   ConciseCasts.h
   CPlusPlusMangle.h
@@ -477,6 +480,7 @@ add_library(Halide ${HALIDE_LIBRARY_TYPE}
   CodeGen_Posix.cpp
   CodeGen_PowerPC.cpp
   CodeGen_PTX_Dev.cpp
+  CodeGen_RISCV.cpp
   CodeGen_WebAssembly.cpp
   CodeGen_X86.cpp
   CPlusPlusMangle.cpp
@@ -673,6 +677,11 @@ endif()
 if (TARGET_WEBASSEMBLY)
   target_compile_definitions(Halide PRIVATE "-DWITH_WEBASSEMBLY=1")
   list(APPEND LLVM_COMPONENTS WebAssembly)
+endif()
+
+if (TARGET_RISCV)
+  target_compile_definitions(Halide PRIVATE "-DWITH_RISCV=1")
+  list(APPEND LLVM_COMPONENTS RISCV)
 endif()
 
 if (TARGET_PTX)

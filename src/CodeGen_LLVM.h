@@ -129,6 +129,7 @@ protected:
     static bool llvm_AArch64_enabled;
     static bool llvm_NVPTX_enabled;
     static bool llvm_Mips_enabled;
+    static bool llvm_RISCV_enabled;
     static bool llvm_PowerPC_enabled;
     static bool llvm_AMDGPU_enabled;
     static bool llvm_WebAssembly_enabled;

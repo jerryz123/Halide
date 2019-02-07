@@ -225,6 +225,14 @@ DECLARE_NO_INITMOD(mips)
 DECLARE_NO_INITMOD(mips_cpu_features)
 #endif  // WITH_MIPS
 
+#ifdef WITH_RISCV
+DECLARE_LL_INITMOD(riscv)
+DECLARE_CPP_INITMOD(riscv_cpu_features)
+#else
+DECLARE_NO_INITMOD(riscv)
+DECLARE_NO_INITMOD(riscv_cpu_features)
+#endif // WITH_RISCV
+
 #ifdef WITH_POWERPC
 DECLARE_LL_INITMOD(powerpc)
 DECLARE_CPP_INITMOD(powerpc_cpu_features)
@@ -308,6 +316,13 @@ llvm::DataLayout get_data_layout_for_target(Target target) {
             return llvm::DataLayout("e-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64");
         } else {
             return llvm::DataLayout("e-m:m-i8:8:32-i16:16:32-i64:64-n32:64-S128");
+        }
+    } else if (target.arch == Target::RISCV) {
+      // TODO: Figure this out
+        if (target.bits == 32) {
+            return llvm::DataLayout("e-m:e-p:64:64-i64:64-i128:128-n64-S128");
+        } else {
+            return llvm::DataLayout("e-m:e-p:64:64-i64:64-i128:128-n64-S128");
         }
     } else if (target.arch == Target::POWERPC) {
         if (target.bits == 32) {
@@ -419,6 +434,13 @@ llvm::Triple get_triple_for_target(const Target &target) {
         } else {
             user_error << "No mips support for this OS\n";
         }
+    } else if (target.arch == Target::RISCV) {
+      if (target.bits == 32) {
+        triple.setArch(llvm::Triple::riscv32);
+      } else {
+        user_assert(target.bits == 64) << "Target must be 32- or 64-bit.\n";
+        triple.setArch(llvm::Triple::riscv64);
+      }
     } else if (target.arch == Target::POWERPC) {
         #if (WITH_POWERPC)
         // Only ppc*-unknown-linux-gnu are supported for the time being.
@@ -820,6 +842,10 @@ std::unique_ptr<llvm::Module> get_initial_module_for_target(Target t, llvm::LLVM
                 if (t.arch == Target::Hexagon) {
                     modules.push_back(get_initmod_qurt_allocator(c, bits_64, debug));
                 }
+                if (t.arch == Target::RISCV) {
+                    // For RISCV NoOS is the newlib runtime, which has POSIX malloc
+                    modules.push_back(get_initmod_posix_allocator(c, bits_64, debug));
+                }
                 modules.push_back(get_initmod_fake_thread_pool(c, bits_64, debug));
             } else if (t.os == Target::Fuchsia) {
                 modules.push_back(get_initmod_posix_allocator(c, bits_64, debug));
@@ -941,6 +967,9 @@ std::unique_ptr<llvm::Module> get_initial_module_for_target(Target t, llvm::LLVM
             if (t.arch == Target::POWERPC) {
                 modules.push_back(get_initmod_powerpc_ll(c));
             }
+            if (t.arch == Target::RISCV) {
+                modules.push_back(get_initmod_riscv_ll(c));
+            }
             if (t.arch == Target::Hexagon) {
                 modules.push_back(get_initmod_qurt_hvx(c, bits_64, debug));
                 if (t.has_feature(Target::HVX_64)) {
@@ -989,6 +1018,9 @@ std::unique_ptr<llvm::Module> get_initial_module_for_target(Target t, llvm::LLVM
             }
             if (t.arch == Target::MIPS) {
                 modules.push_back(get_initmod_mips_cpu_features(c, bits_64, debug));
+            }
+            if (t.arch == Target::RISCV) {
+                modules.push_back(get_initmod_riscv_cpu_features(c, bits_64, debug));
             }
             if (t.arch == Target::POWERPC) {
                 modules.push_back(get_initmod_powerpc_cpu_features(c, bits_64, debug));
