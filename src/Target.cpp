@@ -304,6 +304,7 @@ const std::map<std::string, Target::Feature> feature_name_map = {
     {"trace_stores", Target::TraceStores},
     {"trace_realizations", Target::TraceRealizations},
     {"d3d12compute", Target::D3D12Compute},
+    {"hwacha", Target::Hwacha},
     {"strict_float", Target::StrictFloat},
     {"legacy_buffer_wrappers", Target::LegacyBufferWrappers},
     {"tsan", Target::TSAN},
@@ -586,6 +587,9 @@ bool Target::supported() const {
 #if !defined(WITH_D3D12)
     bad |= has_feature(Target::D3D12Compute);
 #endif
+#if !defined(WITH_HWACHA)
+    bad |= has_feature(Target::Hwacha);
+#endif
     return !bad;
 }
 
@@ -638,7 +642,7 @@ Target Target::without_feature(Feature f) const {
 }
 
 bool Target::has_gpu_feature() const {
-    return has_feature(CUDA) || has_feature(OpenCL) || has_feature(Metal) || has_feature(D3D12Compute);
+  return has_feature(CUDA) || has_feature(OpenCL) || has_feature(Metal) || has_feature(D3D12Compute) || has_feature(Hwacha);
 }
 
 bool Target::supports_type(const Type &t) const {
@@ -704,6 +708,7 @@ Target::Feature target_feature_for_device_api(DeviceAPI api) {
     case DeviceAPI::Metal:         return Target::Metal;
     case DeviceAPI::Hexagon:       return Target::HVX_128;
     case DeviceAPI::D3D12Compute:  return Target::D3D12Compute;
+    case DeviceAPI::Hwacha:        return Target::Hwacha;
     default:                       return Target::FeatureEnd;
     }
 }

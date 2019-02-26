@@ -31,7 +31,8 @@ extern "C" unsigned char halide_internal_runtime_header_HalideRuntimeOpenGLCompu
 extern "C" unsigned char halide_internal_runtime_header_HalideRuntimeOpenGL_h[];
 extern "C" unsigned char halide_internal_runtime_header_HalideRuntimeQurt_h[];
 extern "C" unsigned char halide_internal_runtime_header_HalideRuntimeD3D12Compute_h[];
-
+extern "C" unsigned char halide_internal_runtime_header_HalideRuntimeHwacha_h[];
+  
 namespace {
 
 const string headers =
@@ -320,6 +321,9 @@ CodeGen_C::~CodeGen_C() {
             if (target.has_feature(Target::D3D12Compute)) {
                 stream << halide_internal_runtime_header_HalideRuntimeD3D12Compute_h << '\n';
             }
+            // if (target.has_feature(Target::Hwacha)) {
+            //     stream << halide_internal_runtime_header_HalideRuntimeHwacha_h << '\n';
+            // }
         }
         stream << "#endif\n";
     }

@@ -290,13 +290,15 @@ void CodeGen_LLVM::set_context(llvm::LLVMContext &context) {
 
 CodeGen_LLVM *CodeGen_LLVM::new_for_target(const Target &target,
                                            llvm::LLVMContext &context) {
+
     // The awkward mapping from targets to code generators
     if (target.features_any_of({Target::CUDA,
                                 Target::OpenCL,
                                 Target::OpenGL,
                                 Target::OpenGLCompute,
                                 Target::Metal,
-                                Target::D3D12Compute})) {
+                                Target::D3D12Compute,
+                                Target::Hwacha})) {
 #ifdef WITH_X86
         if (target.arch == Target::X86) {
             return make_codegen<CodeGen_GPU_Host<CodeGen_X86>>(target, context);

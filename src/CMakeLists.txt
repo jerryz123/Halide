@@ -296,6 +296,7 @@ set(HEADER_FILES
   CodeGen_Posix.h
   CodeGen_PowerPC.h
   CodeGen_PTX_Dev.h
+  CodeGen_Hwacha_Dev.h
   CodeGen_RISCV.h
   CodeGen_X86.h
   ConciseCasts.h
@@ -467,6 +468,7 @@ add_library(Halide ${HALIDE_LIBRARY_TYPE}
   CodeGen_OpenGLCompute_Dev.cpp
   CodeGen_PowerPC.cpp
   CodeGen_PTX_Dev.cpp
+  CodeGen_Hwacha_Dev.cpp
   CodeGen_Posix.cpp
   CodeGen_RISCV.cpp
   CodeGen_X86.cpp
@@ -661,6 +663,11 @@ endif()
 if (TARGET_PTX)
   target_compile_definitions(Halide PRIVATE "-DWITH_PTX=1")
   list(APPEND LLVM_COMPONENTS NVPTX)
+endif()
+
+if (TARGET_Hwacha)
+  target_compile_definitions(Halide PRIVATE "-DWITH_HWACHA=1")
+  list(APPEND LLVM_COMPONENTS Hwacha)
 endif()
 
 if (TARGET_AMDGPU)

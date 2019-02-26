@@ -96,6 +96,7 @@ struct Target {
         TraceStores = halide_target_feature_trace_stores,
         TraceRealizations = halide_target_feature_trace_realizations,
         D3D12Compute = halide_target_feature_d3d12compute,
+        Hwacha = halide_target_feature_hwacha,
         StrictFloat = halide_target_feature_strict_float,
         LegacyBufferWrappers = halide_target_feature_legacy_buffer_wrappers,
         TSAN = halide_target_feature_tsan,
@@ -156,7 +157,7 @@ struct Target {
 
     /** Is a fully feature GPU compute runtime enabled? I.e. is
      * Func::gpu_tile and similar going to work? Currently includes
-     * CUDA, OpenCL, Metal and D3D12Compute. We do not include OpenGL,
+     * CUDA, OpenCL, Metal, D3D12Compute, and Hwacha. We do not include OpenGL,
      * because it is not capable of gpgpu, and is not scheduled via
      * Func::gpu_tile.
      * TODO: Should OpenGLCompute be included here? */

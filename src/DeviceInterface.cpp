@@ -60,6 +60,8 @@ const halide_device_interface_t *get_device_interface_for_device_api(DeviceAPI d
         name = "hexagon_dma";
     } else if (d == DeviceAPI::D3D12Compute) {
         name = "d3d12compute";
+    } else if (d == DeviceAPI::Hwacha) {
+        name = "hwacha";
     } else {
         if (error_site) {
             user_error << "get_device_interface_for_device_api called from " << error_site <<
@@ -102,6 +104,8 @@ DeviceAPI get_default_device_api_for_target(const Target &target) {
         return DeviceAPI::HexagonDma;
     } else if (target.has_feature(Target::D3D12Compute)) {
         return DeviceAPI::D3D12Compute;
+    } else if (target.has_feature(Target::Hwacha)) {
+        return DeviceAPI::Hwacha;
     } else {
         return DeviceAPI::Host;
     }
@@ -138,6 +142,9 @@ Expr make_device_interface_call(DeviceAPI device_api) {
         break;
     case DeviceAPI::D3D12Compute:
         interface_name = "halide_d3d12compute_device_interface";
+        break;
+    case DeviceAPI::Hwacha:
+        interface_name= "halide_hwacha_device_interface";
         break;
     case DeviceAPI::Default_GPU:
         // Will be resolved later

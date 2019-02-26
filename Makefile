@@ -113,6 +113,7 @@ WITH_OPENCL ?= not-empty
 WITH_METAL ?= not-empty
 WITH_OPENGL ?= not-empty
 WITH_D3D12 ?= not-empty
+WITH_HWACHA ?= not-empty
 ifeq ($(OS), Windows_NT)
     WITH_INTROSPECTION ?=
 else
@@ -160,6 +161,9 @@ OPENGL_CXX_FLAGS=$(if $(WITH_OPENGL), -DWITH_OPENGL=1, )
 D3D12_CXX_FLAGS=$(if $(WITH_D3D12), -DWITH_D3D12=1, )
 D3D12_LLVM_CONFIG_LIB=$(if $(WITH_D3D12), , )
 
+HWACHA_CXX_FLAGS=$(if $(WITH_HWACHA), -DWITH_HWACHA=1, )
+HWACHA_LLVM_CONFIG_LIB=$(if $(WITH_HWACHA), , )
+
 AARCH64_CXX_FLAGS=$(if $(WITH_AARCH64), -DWITH_AARCH64=1, )
 AARCH64_LLVM_CONFIG_LIB=$(if $(WITH_AARCH64), aarch64, )
 
@@ -196,6 +200,7 @@ CXX_FLAGS += $(OPENGL_CXX_FLAGS)
 CXX_FLAGS += $(D3D12_CXX_FLAGS)
 CXX_FLAGS += $(MIPS_CXX_FLAGS)
 CXX_FLAGS += $(RISCV_CXX_FLAGS)
+CXX_FLAGS += $(HWACHA_CXX_FLAGS)
 CXX_FLAGS += $(POWERPC_CXX_FLAGS)
 CXX_FLAGS += $(INTROSPECTION_CXX_FLAGS)
 CXX_FLAGS += $(EXCEPTIONS_CXX_FLAGS)
@@ -393,6 +398,7 @@ SOURCE_FILES = \
   CodeGen_Metal_Dev.cpp \
   CodeGen_OpenGL_Dev.cpp \
   CodeGen_OpenGLCompute_Dev.cpp \
+  CodeGen_Hwacha_Dev.cpp \
   CodeGen_Posix.cpp \
   CodeGen_PowerPC.cpp \
   CodeGen_RISCV.cpp \
@@ -555,6 +561,7 @@ HEADER_FILES = \
   CodeGen_Metal_Dev.h \
   CodeGen_OpenGL_Dev.h \
   CodeGen_OpenGLCompute_Dev.h \
+  CodeGen_Hwacha_Dev.h \
   CodeGen_Posix.h \
   CodeGen_PowerPC.h \
   CodeGen_PTX_Dev.h \

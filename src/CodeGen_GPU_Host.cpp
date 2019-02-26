@@ -8,6 +8,7 @@
 #include "CodeGen_OpenGL_Dev.h"
 #include "CodeGen_PTX_Dev.h"
 #include "CodeGen_D3D12Compute_Dev.h"
+#include "CodeGen_Hwacha_Dev.h"
 #include "Debug.h"
 #include "ExprUsesVar.h"
 #include "IROperator.h"
@@ -124,6 +125,10 @@ CodeGen_GPU_Host<CodeGen_CPU>::CodeGen_GPU_Host(Target target) : CodeGen_CPU(tar
     if (target.has_feature(Target::D3D12Compute)) {
         debug(1) << "Constructing Direct3D 12 Compute device codegen\n";
         cgdev[DeviceAPI::D3D12Compute] = new CodeGen_D3D12Compute_Dev(target);
+    }
+    if (target.has_feature(Target::Hwacha)) {
+        debug(1) << "Constructing Hwacha device codegen\n";
+        cgdev[DeviceAPI::Hwacha] = new CodeGen_Hwacha_Dev(target);
     }
 
     if (cgdev.empty()) {
