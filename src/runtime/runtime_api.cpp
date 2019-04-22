@@ -5,6 +5,7 @@
 #include "HalideRuntimeOpenCL.h"
 #include "HalideRuntimeMetal.h"
 #include "HalideRuntimeHexagonHost.h"
+#include "HalideRuntimeHwacha.h"
 #include "HalideRuntimeD3D12Compute.h"
 #include "HalideRuntimeQurt.h"
 #include "cpu_features.h"
@@ -106,6 +107,8 @@ extern "C" __attribute__((used)) void *halide_runtime_api_functions[] = {
     (void *)&halide_hexagon_set_performance,
     (void *)&halide_hexagon_set_performance_mode,
     (void *)&halide_hexagon_wrap_device_handle,
+    (void *)&halide_hwacha_initialize_kernels,
+    (void *)&halide_hwacha_run,
     (void *)&halide_int64_to_string,
     (void *)&halide_join_thread,
     (void *)&halide_load_library,

@@ -35,6 +35,7 @@ set(RUNTIME_CPP
   hexagon_dma
   hexagon_dma_pool
   hexagon_host
+  hwacha
   ios_io
   linux_clock
   linux_host_cpu_count
@@ -243,6 +244,7 @@ set(RUNTIME_HEADER_FILES
   HalideRuntime.h
   HalideRuntimeCuda.h
   HalideRuntimeHexagonHost.h
+  HalideRuntimeHwacha.h
   HalideRuntimeOpenCL.h
   HalideRuntimeMetal.h
   HalideRuntimeOpenGL.h
@@ -665,7 +667,7 @@ if (TARGET_PTX)
   list(APPEND LLVM_COMPONENTS NVPTX)
 endif()
 
-if (TARGET_Hwacha)
+if (TARGET_RISCV)
   target_compile_definitions(Halide PRIVATE "-DWITH_HWACHA=1")
   list(APPEND LLVM_COMPONENTS Hwacha)
 endif()

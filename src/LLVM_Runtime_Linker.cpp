@@ -226,6 +226,9 @@ DECLARE_NO_INITMOD(mips_cpu_features)
 #ifdef WITH_RISCV
 DECLARE_LL_INITMOD(riscv)
 DECLARE_CPP_INITMOD(riscv_cpu_features)
+#ifdef WITH_HWACHA
+DECLARE_CPP_INITMOD(hwacha)
+#endif
 #else
 DECLARE_NO_INITMOD(riscv)
 DECLARE_NO_INITMOD(riscv_cpu_features)
@@ -769,8 +772,10 @@ std::unique_ptr<llvm::Module> get_initial_module_for_target(Target t, llvm::LLVM
                     modules.push_back(get_initmod_qurt_allocator(c, bits_64, debug));
                 }
                 if (t.arch == Target::RISCV) {
-                    // For RISCV NoOS is the newlib runtime, which has POSIX malloc
+                    // For RISCV NoOS is the newlib runtime, which has POSIX malloc and print
                     modules.push_back(get_initmod_posix_allocator(c, bits_64, debug));
+                    modules.push_back(get_initmod_posix_print(c, bits_64, debug));
+                    modules.push_back(get_initmod_posix_io(c, bits_64, debug));
                 }
                 modules.push_back(get_initmod_fake_thread_pool(c, bits_64, debug));
             }
@@ -881,6 +886,9 @@ std::unique_ptr<llvm::Module> get_initial_module_for_target(Target t, llvm::LLVM
             }
             if (t.arch == Target::RISCV) {
                 modules.push_back(get_initmod_riscv_ll(c));
+                if (t.has_feature(Target::Hwacha)) {
+                  modules.push_back(get_initmod_hwacha(c, bits_64, debug));
+                }
             }
             if (t.arch == Target::Hexagon) {
                 modules.push_back(get_initmod_qurt_hvx(c, bits_64, debug));
@@ -1099,6 +1107,29 @@ std::unique_ptr<llvm::Module> get_initial_module_for_ptx_device(Target target, l
     return std::move(modules[0]);
 }
 #endif
+
+// #ifdef WITH_HWACHA
+// std::unique_ptr<llvm::Module> get_initial_module_for_hwacha_device(Target target, llvm::LLVMContext *c) {
+//     std::vector<std::unique_ptr<llvm::Module>> modules;
+//     modules.push_back(get_initmod_hwacha_dev_ll(c));
+
+//     std::unique_ptr<llvm::Module> module;
+//     module = get_initmod_hwacha(c);
+//     modules.push_back(std::move(module));
+
+//     link_modules(modules, target);
+
+
+//     llvm::Triple triple = get_triple_for_target(target);
+
+//     modules[0]->setTargetTriple(triple.str());
+
+//     llvm::DataLayout dl = get_data_layout_for_target(target);
+//     modules[0]->setDataLayout(dl);
+
+//     return std::move(modules[0]);
+// }
+// #endif
 
 void add_bitcode_to_module(llvm::LLVMContext *context, llvm::Module &module,
                            const std::vector<uint8_t> &bitcode, const std::string &name) {

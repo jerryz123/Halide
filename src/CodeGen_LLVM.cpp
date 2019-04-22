@@ -319,6 +319,11 @@ CodeGen_LLVM *CodeGen_LLVM::new_for_target(const Target &target,
             return make_codegen<CodeGen_GPU_Host<CodeGen_PowerPC>>(target, context);
         }
 #endif
+#ifdef WITH_RISCV
+        if (target.arch == Target::RISCV) {
+            return make_codegen<CodeGen_GPU_Host<CodeGen_RISCV>>(target, context);
+        }
+#endif
 
         user_error << "Invalid target architecture for GPU backend: "
                    << target.to_string() << "\n";

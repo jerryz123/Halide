@@ -717,6 +717,7 @@ RUNTIME_CPP_COMPONENTS = \
   hexagon_dma_pool \
   hexagon_dma \
   hexagon_host \
+  hwacha \
   ios_io \
   linux_clock \
   linux_host_cpu_count \
@@ -806,6 +807,7 @@ RUNTIME_EXPORTED_INCLUDES = $(INCLUDE_DIR)/HalideRuntime.h \
                             $(INCLUDE_DIR)/HalideRuntimeCuda.h \
                             $(INCLUDE_DIR)/HalideRuntimeHexagonDma.h \
                             $(INCLUDE_DIR)/HalideRuntimeHexagonHost.h \
+                            $(INCLUDE_DIR)/HalideRuntimeHwacha.h \
                             $(INCLUDE_DIR)/HalideRuntimeOpenCL.h \
                             $(INCLUDE_DIR)/HalideRuntimeOpenGL.h \
                             $(INCLUDE_DIR)/HalideRuntimeOpenGLCompute.h \
