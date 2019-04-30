@@ -886,9 +886,6 @@ std::unique_ptr<llvm::Module> get_initial_module_for_target(Target t, llvm::LLVM
             }
             if (t.arch == Target::RISCV) {
                 modules.push_back(get_initmod_riscv_ll(c));
-                if (t.has_feature(Target::Hwacha)) {
-                  modules.push_back(get_initmod_hwacha(c, bits_64, debug));
-                }
             }
             if (t.arch == Target::Hexagon) {
                 modules.push_back(get_initmod_qurt_hvx(c, bits_64, debug));
@@ -1108,28 +1105,28 @@ std::unique_ptr<llvm::Module> get_initial_module_for_ptx_device(Target target, l
 }
 #endif
 
-// #ifdef WITH_HWACHA
-// std::unique_ptr<llvm::Module> get_initial_module_for_hwacha_device(Target target, llvm::LLVMContext *c) {
-//     std::vector<std::unique_ptr<llvm::Module>> modules;
-//     modules.push_back(get_initmod_hwacha_dev_ll(c));
-
-//     std::unique_ptr<llvm::Module> module;
-//     module = get_initmod_hwacha(c);
-//     modules.push_back(std::move(module));
-
-//     link_modules(modules, target);
+#ifdef WITH_HWACHA
+std::unique_ptr<llvm::Module> get_initial_module_for_hwacha_device(Target target, llvm::LLVMContext *c) {
+    std::vector<std::unique_ptr<llvm::Module>> modules;
+    //    modules.push_back(get_initmod_riscv_ll(c));
+    bool bits_64 = (target.bits == 64);
+    bool debug = target.has_feature(Target::Debug);
+    modules.push_back(get_initmod_hwacha(c, bits_64, debug));
 
 
-//     llvm::Triple triple = get_triple_for_target(target);
+    link_modules(modules, target);
 
-//     modules[0]->setTargetTriple(triple.str());
 
-//     llvm::DataLayout dl = get_data_layout_for_target(target);
-//     modules[0]->setDataLayout(dl);
+    llvm::Triple triple = get_triple_for_target(target);
 
-//     return std::move(modules[0]);
-// }
-// #endif
+    modules[0]->setTargetTriple(triple.str());
+
+    llvm::DataLayout dl = get_data_layout_for_target(target);
+    modules[0]->setDataLayout(dl);
+
+    return std::move(modules[0]);
+}
+#endif
 
 void add_bitcode_to_module(llvm::LLVMContext *context, llvm::Module &module,
                            const std::vector<uint8_t> &bitcode, const std::string &name) {
