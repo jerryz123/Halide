@@ -1,6 +1,6 @@
 #include "HalideRuntimeHwacha.h"
 // #include "scoped_spin_lock.h"
-// #include "device_buffer_utils.h"
+#include "device_buffer_utils.h"
 #include "device_interface.h"
 #include "printer.h"
 
@@ -664,7 +664,8 @@ WEAK int halide_hwacha_copy_to_host(void *user_context, halide_buffer_t* buffer)
     //     return -1;
     // }
 
-    // device_copy c = make_device_to_host_copy(buffer);
+    make_device_to_host_copy(buffer);
+    //device_copy c = make_device_to_host_copy(buffer);
     // c.src = (uint64_t)buffer_contents(((device_handle *)c.src)->buf) + ((device_handle *)c.src)->offset;
 
     // copy_memory(c, user_context);

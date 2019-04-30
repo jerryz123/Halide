@@ -12,6 +12,7 @@
 #include "Simplify.h"
 #include "Solve.h"
 #include "Target.h"
+#include "LLVM_Output.h"
 
 #include <fstream>
 
@@ -46,6 +47,8 @@ void CodeGen_Hwacha_Dev::add_kernel(Stmt stmt,
                                  const std::vector<DeviceArgument> &args) {
     internal_assert(module != nullptr);
 
+    device_args = args;
+
     std::cout << "In CodeGen_Hwacha_Dev::add_kernel\n";
 
     // Now deduce the types of the arguments to our function
@@ -59,22 +62,17 @@ void CodeGen_Hwacha_Dev::add_kernel(Stmt stmt,
         }
     }
 
+    device_arg_types = arg_types;
+
     // Make our function
     FunctionType *func_t = FunctionType::get(void_t, arg_types, false);
     std::cout << "creating function with name" << name << "\n";
-    function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, name, module.get());
-
-    llvm::Metadata *md_args[] = {
-      llvm::ValueAsMetadata::get(function)
-    };
-    llvm::MDNode *md_node = llvm::MDNode::get(*context, md_args);
-    module->getOrInsertNamedMetadata("opencl.kernels")->addOperand(md_node);
-
-    std::string Str;
-    raw_string_ostream OS(Str);
-    OS << *function;
-    OS.flush();
-    std::cout << Str;
+    function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, name, nullptr);
+    std::string Str1;
+    raw_string_ostream OS1(Str1);
+    OS1 << *function;
+    OS1.flush();
+    std::cout << Str1;
 
     set_function_attributes_for_target(function, target);
 
@@ -84,10 +82,6 @@ void CodeGen_Hwacha_Dev::add_kernel(Stmt stmt,
             function->addParamAttr(i, Attribute::NoAlias);
         }
     }
-
-    // Make the initial basic block
-    //    entry_block = BasicBlock::Create(*context, "entry", function);
-    //    builder->SetInsertPoint(entry_block);
 
     // Put the arguments in the symbol table
     vector<string> arg_sym_names;
@@ -110,38 +104,21 @@ void CodeGen_Hwacha_Dev::add_kernel(Stmt stmt,
     BasicBlock *body_block = BasicBlock::Create(*context, "body", function);
     builder->SetInsertPoint(body_block);
 
-    std::cout << "Generating llvm bitcode for kernel...\n";
     // Ok, we have a module, function, context, and a builder
     // pointing at a brand new basic block. We're good to go.
-    std::cout << stmt;
     stmt.accept(this);
-    std::cout << "Done generating?\n";
 
     // Now we need to end the function
     builder->CreateRetVoid();
 
-    // Make the entry block point to the body block
-    //builder->SetInsertPoint(entry_block);
-    //builder->CreateBr(body_block);
-
-    // Add the annotation that it is a kernel function.
-    // llvm::Metadata *md_args[] = {
-    //     llvm::ValueAsMetadata::get(function),
-    //     MDString::get(*context, "kernel"),
-    //     llvm::ValueAsMetadata::get(ConstantInt::get(i32_t, 1))
-    // };
-
-    //MDNode *md_node = MDNode::get(*context, md_args);
-
-    //module->getOrInsertNamedMetadata("nvvm.annotations")->addOperand(md_node);
-
+    module->getFunctionList().push_back(function);
 
     // Now verify the function is ok
     verifyFunction(*function);
 
-    // Finally, verify the module is ok
+    // // Finally, verify the module is ok
     verifyModule(*module);
-    
+
     std::cout << "Done generating llvm bitcode for Hwacha\n";
 
     // Clear the symbol table
@@ -154,9 +131,18 @@ void CodeGen_Hwacha_Dev::init_module() {
     init_context();
 
     #ifdef WITH_HWACHA
-    module = get_initial_module_for_target(target, context);
+    module = get_initial_module_for_hwacha_device(target, context);
     #endif
 }
+
+void CodeGen_Hwacha_Dev::set_module(std::unique_ptr<llvm::Module> mod,
+                                      llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> *build) {
+
+  module = std::move(mod);
+  builder = build;
+}
+
+
 
 void CodeGen_Hwacha_Dev::visit(const Call *op) {
   //internal_assert(false) << "Not implemented\n";
@@ -202,21 +188,123 @@ string CodeGen_Hwacha_Dev::simt_intrinsic(const string &name) {
     return "";
 }
 
+llvm::Function* CodeGen_Hwacha_Dev::add_stripmine_loop(Stmt stmt, const std::string &name) {
+    std::cout << "In add_stripmine\n";
+
+    llvm::Function* oldFunction = function;
+
+    FunctionType *func_t = FunctionType::get(void_t, device_arg_types, false);
+    function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, name, module.get());
+    function->addFnAttr(Attribute::NoInline);
+
+
+    llvm::Metadata *md_args[] = {
+      llvm::ValueAsMetadata::get(function)
+    };
+    llvm::MDNode *md_node = llvm::MDNode::get(*context, md_args);
+    module->getOrInsertNamedMetadata("opencl.kernels")->addOperand(md_node);
+
+    // Mark the buffer args as no alias
+    for (size_t i = 0; i < device_args.size(); i++) {
+        if (device_args[i].is_buffer) {
+            function->addParamAttr(i, Attribute::NoAlias);
+        }
+    }
+
+
+    // Put the arguments in the symbol table
+    vector<string> arg_sym_names;
+    {
+        size_t i = 0;
+        for (auto &fn_arg : function->args()) {
+
+            string arg_sym_name = device_args[i].name;
+            sym_push(arg_sym_name, &fn_arg);
+            fn_arg.setName(arg_sym_name);
+            arg_sym_names.push_back(arg_sym_name);
+
+            i++;
+        }
+    }
+
+
+    // We won't end the entry block yet, because we'll want to add
+    // some allocas to it later if there are local allocations. Start
+    // a new block to put all the code.
+    BasicBlock *body_block = BasicBlock::Create(*context, "body", function);
+    builder->SetInsertPoint(body_block);
+
+    // Ok, we have a module, function, context, and a builder
+    // pointing at a brand new basic block. We're good to go.
+    Expr simt_idx = Cast::make(Int(32), Call::make(Int(64), simt_intrinsic(name), std::vector<Expr>(), Call::Extern));
+    sym_push(name, codegen(simt_idx));
+    stmt.accept(this);
+
+    // Now we need to end the function
+    builder->CreateRetVoid();
+
+    // Now verify the function is ok
+    verifyFunction(*function);
+
+    std::cout << "Done generating llvm bitcode for Hwacha\n";
+
+    // Clear the symbol table
+    for (size_t i = 0; i < arg_sym_names.size(); i++) {
+        sym_pop(arg_sym_names[i]);
+    }
+    sym_pop(name);
+
+    llvm::Function* r = function;
+    function = oldFunction;
+
+    return r;
+}
+
 void CodeGen_Hwacha_Dev::visit(const For *loop) {
     if (is_gpu_var(loop->name)) {
       if (ends_with(loop->name, "__block_id_x")) {
-        std::cout << "visit For: Trying to make hwacha\n";
-        std::cout << loop->name << "\n";
-        Expr simt_idx = Cast::make(Int(32), Call::make(Int(64), simt_intrinsic(loop->name), std::vector<Expr>(), Call::Extern));
+        internal_assert(ends_with(loop->name, "__block_id_x")) << "Not supported variable " << loop->name << "\n";
+
         internal_assert(is_zero(loop->min));
-        sym_push(loop->name, codegen(simt_idx));
-        codegen(loop->body);
-        sym_pop(loop->name);
+        // Value* min = codegen(loop->min);
+        // Value* extent = codegen(loop->extent);
+        // builder->CreateNSWAdd(min, extent);
+
+        BasicBlock* curr_point = builder->GetInsertBlock();
+        llvm::Function* stripmine = add_stripmine_loop(loop->body, loop->name);
+        builder->SetInsertPoint(curr_point);
+
+        std::vector<llvm::Value*> args;
+        for (size_t i = 0 ; i < device_args.size(); i++) {
+          args.push_back(sym_get(device_args[i].name));
+        }
+        builder->CreateCall(stripmine, args);
       } else if (ends_with(loop->name, "__thread_id_x")) {
         codegen(loop->body);
       } else {
         internal_error << "unsupported\n";
       }
+
+
+      // if (ends_with(loop->name, "__block_id_x")) {
+      //   internal_assert(ends_with(loop->name, "__block_id_x")) << "Not supported variable " << loop->name << "\n";
+      //   std::cout << "visit For: Trying to make hwacha\n";
+      //   std::cout << loop->name << "\n";
+
+      //   Expr simt_idx = Cast::make(Int(32), Call::make(Int(64), simt_intrinsic(loop->name), std::vector<Expr>(), Call::Extern));
+      //   internal_assert(is_zero(loop->min));
+      //   sym_push(loop->name, codegen(simt_idx));
+
+
+      //   codegen(loop->body);
+
+
+      //   sym_pop(loop->name);
+      // } else if (ends_with(loop->name, "__thread_id_x")) {
+      //   codegen(loop->body);
+      // } else {
+      //   internal_error << "unsupported\n";
+      // }
     } else {
         CodeGen_LLVM::visit(loop);
     }
@@ -258,7 +346,7 @@ void CodeGen_Hwacha_Dev::visit(const Allocate *alloc) {
 }
 
 void CodeGen_Hwacha_Dev::visit(const Free *f) {
-    internal_assert(false) << "Not implemented\n";    
+    internal_assert(false) << "Not implemented\n";
     // sym_pop(f->name);
 }
 
@@ -328,17 +416,17 @@ bool CodeGen_Hwacha_Dev::use_soft_float_abi() const {
     return true;
 }
 
+std::unique_ptr<llvm::Module> CodeGen_Hwacha_Dev::get_module() {
+  return std::move(module);
+
+}
+
 vector<char> CodeGen_Hwacha_Dev::compile_to_src() {
 
   std::cout << "compiling hwacha to src\n";
     #ifdef WITH_HWACHA
 
   std::cout       << "In CodeGen_Hwacha_Dev::compile_to_src\n";
-  std::string Str;
-  raw_string_ostream OS(Str);
-  OS << *module;
-  OS.flush();
-  std::cout << Str;
 
     // DISABLED - hooked in here to force PrintBeforeAll option - seems to be the only way?
     /*char* argv[] = { "llc", "-print-before-all" };*/
@@ -417,7 +505,7 @@ vector<char> CodeGen_Hwacha_Dev::compile_to_src() {
     if (fail) {
         internal_error << "Failed to set up passes to emit Hwacha source\n";
     }
-    std::cout << "running passes\n";
+    std::cout << "running passes\n" << std::flush;
     // Run optimization passes
     function_pass_manager.doInitialization();
     for (llvm::Module::iterator i = module->begin(); i != module->end(); i++) {
@@ -429,11 +517,18 @@ vector<char> CodeGen_Hwacha_Dev::compile_to_src() {
     //    if (debug::debug_level() >= 2) {
     //        dump();
         // }
-    std::cout << "Done with CodeGen_Hwacha_Dev::compile_to_src";
+    std::cout << "Done with CodeGen_Hwacha_Dev::compile_to_src\n" << std::flush;
 
-    std::cout << "Hwacha kernel:\n" << outstr.c_str() << "\n";
+    std::cout << "Hwacha kernel:\n" << outstr.c_str() << std::flush;
+    std::cout << "\ndone hwacha kernel\n" << std::flush;
 
     vector<char> buffer(outstr.begin(), outstr.end());
+    std::cout << "returning\n" << std::flush;
+
+    std::ofstream out("hwacha.s");
+    out << outstr.c_str();
+    out.close();
+
     return buffer;
 #else // WITH_Hwacha
     return vector<char>();
@@ -452,7 +547,7 @@ string CodeGen_Hwacha_Dev::get_current_kernel_name() {
 void CodeGen_Hwacha_Dev::dump() {
 // Str now contains the module text
     module->print(dbgs(), nullptr, false, true);
-  
+
 }
 
 std::string CodeGen_Hwacha_Dev::print_gpu_name(const std::string &name) {

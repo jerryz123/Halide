@@ -40,6 +40,15 @@ public:
 
     std::string api_unique_name() override { return "hwacha"; }
 
+    std::vector<DeviceArgument> device_args;
+    std::vector<llvm::Type*> device_arg_types;
+
+    llvm::Function* add_stripmine_loop(Stmt stmt, const std::string &name);
+
+    void set_module(std::unique_ptr<llvm::Module> mod, llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>* build);
+    std::unique_ptr<llvm::Module> get_module();
+
+
 protected:
     using CodeGen_LLVM::visit;
 
@@ -47,6 +56,7 @@ protected:
      * a Hwacha device module will often have many kernels compiled into it for
      * a single pipeline. */
     /* override */ void init_module() override;
+
 
     /** We hold onto the basic block at the start of the device
      * function in order to inject allocas */
