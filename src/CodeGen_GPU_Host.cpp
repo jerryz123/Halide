@@ -9,6 +9,7 @@
 #include "CodeGen_PTX_Dev.h"
 #include "CodeGen_D3D12Compute_Dev.h"
 #include "Debug.h"
+#include "DeviceArgument.h"
 #include "ExprUsesVar.h"
 #include "IROperator.h"
 #include "IRPrinter.h"
@@ -126,7 +127,8 @@ CodeGen_GPU_Host<CodeGen_CPU>::CodeGen_GPU_Host(Target target) : CodeGen_CPU(tar
         cgdev[DeviceAPI::D3D12Compute] = new CodeGen_D3D12Compute_Dev(target);
     }
 
-    if (cgdev.empty()) {
+    // Don't need to create a CodeGen_Dev for Hwacha
+    if (cgdev.empty() && !target.has_feature(Target::Hwacha)) {
         internal_error << "Requested unknown GPU target: " << target.to_string() << "\n";
     }
 }
@@ -138,6 +140,85 @@ CodeGen_GPU_Host<CodeGen_CPU>::~CodeGen_GPU_Host() {
     }
 }
 
+template<typename CodeGen_CPU>
+llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
+                                                                  const std::string &name,
+                                                                  std::vector<DeviceArgument> args,
+                                                                  std::vector<llvm::Type*> arg_types) {
+    std::cout << "In add_stripmine\n";
+
+    llvm::Function* oldFunction = function;
+
+    FunctionType *func_t = FunctionType::get(void_t, arg_types, false);
+    function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, name, nullptr);
+    function->addFnAttr(Attribute::NoInline);
+
+
+    llvm::Metadata *md_args[] = {
+      llvm::ValueAsMetadata::get(function)
+    };
+    llvm::MDNode *md_node = llvm::MDNode::get(*context, md_args);
+    module->getOrInsertNamedMetadata("opencl.kernels")->addOperand(md_node);
+
+    // Mark the buffer args as no alias
+    for (size_t i = 0; i < args.size(); i++) {
+      if (args[i].is_buffer) {
+        function->addParamAttr(i, Attribute::NoAlias);
+      }
+    }
+
+
+    // Put the arguments in the symbol table
+    vector<string> arg_sym_names;
+    {
+      size_t i = 0;
+      for (auto &fn_arg : function->args()) {
+
+        string arg_sym_name = args[i].name;
+        sym_push(arg_sym_name, &fn_arg);
+        fn_arg.setName(arg_sym_name);
+        arg_sym_names.push_back(arg_sym_name);
+
+        i++;
+      }
+    }
+
+
+    // We won't end the entry block yet, because we'll want to add
+    // some allocas to it later if there are local allocations. Start
+    // a new block to put all the code.
+    BasicBlock *body_block = BasicBlock::Create(*context, "body", function);
+    builder->SetInsertPoint(body_block);
+
+    // Ok, we have a module, function, context, and a builder
+    // pointing at a brand new basic block. We're good to go.
+    Expr simt_idx = Cast::make(Int(32), Call::make(Int(64), "llvm.hwacha.veidx", std::vector<Expr>(), Call::Extern));
+    sym_push(name, codegen(simt_idx));
+    stmt.accept(this);
+
+    // Now we need to end the function
+    builder->CreateRetVoid();
+
+    module->getFunctionList().push_front(function);
+
+    // Now verify the function is ok
+    verifyFunction(*function);
+
+    std::cout << "Done generating llvm bitcode for Hwacha\n";
+
+    // Clear the symbol table
+    for (size_t i = 0; i < arg_sym_names.size(); i++) {
+      sym_pop(arg_sym_names[i]);
+    }
+    sym_pop(name);
+
+    llvm::Function* r = function;
+    function = oldFunction;
+
+    return r;
+}
+
+  
 template<typename CodeGen_CPU>
 void CodeGen_GPU_Host<CodeGen_CPU>::compile_func(const LoweredFunc &f,
                                                  const std::string &simple_name,
@@ -222,7 +303,61 @@ void CodeGen_GPU_Host<CodeGen_CPU>::compile_func(const LoweredFunc &f,
 
 template<typename CodeGen_CPU>
 void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
-    if (CodeGen_GPU_Dev::is_gpu_var(loop->name)) {
+    if (CodeGen_GPU_Dev::is_gpu_var(loop->name) && loop->device_api == DeviceAPI::Default_GPU) {
+      if (ends_with(loop->name, "__block_id_x")) {
+        internal_assert(target.has_feature(Target::Hwacha)) << "Must support hwacha\n";
+        internal_assert(ends_with(loop->name, "__block_id_x")) << "Not supported variable " << loop->name << "\n";
+
+        internal_assert(is_zero(loop->min));
+
+        ExtractBounds bounds;
+        loop->accept(&bounds);
+
+        string kernel_name = unique_name("kernel_" + loop->name);
+        for (size_t i = 0; i < kernel_name.size(); i++) {
+          if (!isalnum(kernel_name[i])) {
+                kernel_name[i] = '_';
+            }
+        }
+
+        // compute a closure over the state passed into the kernel
+        HostClosure c(loop->body, loop->name);
+
+        // Determine the arguments that must be passed to Hwacha through vmcs/vmca
+        vector<DeviceArgument> closure_args = c.arguments();
+
+        for (size_t i = 0; i < closure_args.size(); i++) {
+            if (closure_args[i].is_buffer && allocations.contains(closure_args[i].name)) {
+                closure_args[i].size = allocations.get(closure_args[i].name).constant_bytes;
+            }
+        }
+
+        // Now deduce the types of the arguments to our function
+        vector<llvm::Type *> arg_types(closure_args.size());
+        for (size_t i = 0; i < closure_args.size(); i++) {
+          if (closure_args[i].is_buffer) {
+            arg_types[i] = llvm_type_of(UInt(8))->getPointerTo();
+          } else {
+            arg_types[i] = llvm_type_of(closure_args[i].type);
+          }
+        }
+
+        BasicBlock* curr_block = builder->GetInsertBlock();
+        BasicBlock::iterator curr_point = builder->GetInsertPoint();
+        llvm::Function* stripmine = add_stripmine_loop(loop->body, loop->name,
+                                                       closure_args,
+                                                       arg_types);
+        builder->SetInsertPoint(curr_block, curr_point);
+
+        std::vector<llvm::Value*> args;
+        for (size_t i = 0 ; i < closure_args.size(); i++) {
+          args.push_back(sym_get(closure_args[i].name));
+        }
+        builder->CreateCall(stripmine, args);
+      } else if (ends_with(loop->name, "__thread_id_x")) {
+        codegen(loop->body);
+      }
+    } else if (CodeGen_GPU_Dev::is_gpu_var(loop->name)) {
         // We're in the loop over outermost block dimension
         debug(2) << "Kernel launch: " << loop->name << "\n";
 
@@ -582,6 +717,10 @@ template class CodeGen_GPU_Host<CodeGen_PowerPC>;
 
 #ifdef WITH_WEBASSEMBLY
 template class CodeGen_GPU_Host<CodeGen_WebAssembly>;
+#endif
+
+#ifdef WITH_RISCV
+template class CodeGen_GPU_Host<CodeGen_RISCV>;
 #endif
 
 }  // namespace Internal

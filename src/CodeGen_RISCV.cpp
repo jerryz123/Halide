@@ -29,7 +29,10 @@ string CodeGen_RISCV::mattrs() const {
     if (target.bits == 32) {
         return "+a,+c,+f,+m";
     } else {
-        return "+64bit,+a,+c,+d,+f,+m";
+        if (target.has_feature(Target::Hwacha))
+            return "+64bit,+a,+c,+d,+f,+m,+x";
+        else
+            return "+64bit,+a,+c,+d,+f,+m";
     }
 }
 

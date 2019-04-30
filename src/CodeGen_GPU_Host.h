@@ -12,7 +12,9 @@
 #include "CodeGen_PowerPC.h"
 #include "CodeGen_WebAssembly.h"
 #include "CodeGen_X86.h"
+#include "CodeGen_RISCV.h"
 
+#include "DeviceArgument.h"
 #include "IR.h"
 
 namespace Halide {
@@ -51,6 +53,7 @@ protected:
     using CodeGen_CPU::i64_t;
     using CodeGen_CPU::i16_t;
     using CodeGen_CPU::i8_t;
+    using CodeGen_CPU::void_t;
     using CodeGen_CPU::type_t_type;
     using CodeGen_CPU::init_module;
     using CodeGen_CPU::llvm_type_of;
@@ -66,6 +69,10 @@ protected:
     /** Nodes for which we need to override default behavior for the GPU runtime */
     // @{
     void visit(const For *) override;
+    llvm::Function* add_stripmine_loop(Stmt stmt,
+                                       const std::string &name,
+                                       std::vector<DeviceArgument> args,
+                                       std::vector<llvm::Type*> arg_types);
     // @}
 
     std::string function_name;

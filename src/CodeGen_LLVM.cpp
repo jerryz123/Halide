@@ -303,6 +303,7 @@ CodeGen_LLVM *CodeGen_LLVM::new_for_target(const Target &target,
                                 Target::OpenGL,
                                 Target::OpenGLCompute,
                                 Target::Metal,
+                                Target::Hwacha,
                                 Target::D3D12Compute})) {
 #ifdef WITH_X86
         if (target.arch == Target::X86) {
@@ -329,6 +330,12 @@ CodeGen_LLVM *CodeGen_LLVM::new_for_target(const Target &target,
             return make_codegen<CodeGen_GPU_Host<CodeGen_WebAssembly>>(target, context);
         }
 #endif
+#ifdef WITH_RISCV
+        if (target.arch == Target::RISCV) {
+            return make_codegen<CodeGen_GPU_Host<CodeGen_RISCV>>(target, context);
+        }
+#endif
+
         user_error << "Invalid target architecture for GPU backend: "
                    << target.to_string() << "\n";
         return nullptr;

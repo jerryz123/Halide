@@ -682,6 +682,9 @@ endif()
 if (TARGET_RISCV)
   target_compile_definitions(Halide PRIVATE "-DWITH_RISCV=1")
   list(APPEND LLVM_COMPONENTS RISCV)
+
+  target_compile_definitions(Halide PRIVATE "-DWITH_HWACHA=1")
+  list(APPEND LLVM_COMPONENTS Hwacha)
 endif()
 
 if (TARGET_PTX)

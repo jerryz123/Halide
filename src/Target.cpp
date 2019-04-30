@@ -355,6 +355,7 @@ const std::map<std::string, Target::Feature> feature_name_map = {
     {"trace_stores", Target::TraceStores},
     {"trace_realizations", Target::TraceRealizations},
     {"d3d12compute", Target::D3D12Compute},
+    {"hwacha", Target::Hwacha},
     {"strict_float", Target::StrictFloat},
     {"legacy_buffer_wrappers", Target::LegacyBufferWrappers},
     {"tsan", Target::TSAN},
@@ -640,6 +641,9 @@ bool Target::supported() const {
 #if !defined(WITH_D3D12)
     bad |= has_feature(Target::D3D12Compute);
 #endif
+#if !defined(WITH_HWACHA)
+    bad |= has_feature(Target::Hwacha);
+#endif
 #if defined(WITH_WEBASSEMBLY) && LLVM_VERSION < 90
     // LLVM8 supports wasm, but there are fixes and improvements
     // in trunk that may not be in 8 (or that we haven't tested with),
@@ -748,7 +752,7 @@ bool Target::supports_device_api(DeviceAPI api) const {
     switch (api) {
     case DeviceAPI::None:        return true;
     case DeviceAPI::Host:        return true;
-    case DeviceAPI::Default_GPU: return has_gpu_feature() || has_feature(Target::OpenGLCompute);
+    case DeviceAPI::Default_GPU: return has_gpu_feature() || has_feature(Target::OpenGLCompute) || has_feature(Target::Hwacha);
     case DeviceAPI::Hexagon:     return has_feature(Target::HVX_64) || has_feature(Target::HVX_128);
     case DeviceAPI::HexagonDma:  return has_feature(Target::HexagonDma);
     default:                     return has_feature(target_feature_for_device_api(api));

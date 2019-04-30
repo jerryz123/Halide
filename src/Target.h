@@ -108,6 +108,7 @@ struct Target {
         TraceStores = halide_target_feature_trace_stores,
         TraceRealizations = halide_target_feature_trace_realizations,
         D3D12Compute = halide_target_feature_d3d12compute,
+        Hwacha = halide_target_feature_hwacha,
         StrictFloat = halide_target_feature_strict_float,
         LegacyBufferWrappers = halide_target_feature_legacy_buffer_wrappers,
         TSAN = halide_target_feature_tsan,
