@@ -147,9 +147,19 @@ llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
                                                                   std::vector<llvm::Type*> arg_types) {
     llvm::Function* oldFunction = function;
 
+    string kernel_name = unique_name("kernel_" + name);
+    for (size_t i = 0; i < kernel_name.size(); i++) {
+      if (!isalnum(kernel_name[i])) {
+        kernel_name[i] = '_';
+      }
+    }
+
+
+
     FunctionType *func_t = FunctionType::get(i64_t, arg_types, false);
-    function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, name, nullptr);
+    function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, kernel_name, nullptr);
     function->addFnAttr(Attribute::NoInline);
+    function->addFnAttr(Attribute::OptimizeNone);
 
 
     llvm::Metadata *md_args[] = {
@@ -307,13 +317,6 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
         ExtractBounds bounds;
         loop->accept(&bounds);
 
-        string kernel_name = unique_name("kernel_" + loop->name);
-        for (size_t i = 0; i < kernel_name.size(); i++) {
-          if (!isalnum(kernel_name[i])) {
-                kernel_name[i] = '_';
-            }
-        }
-
         // compute a closure over the state passed into the kernel
         HostClosure c(loop->body, loop->name);
 
@@ -337,12 +340,11 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
           }
         }
 
-        BasicBlock* curr_block = builder->GetInsertBlock();
-        BasicBlock::iterator curr_point = builder->GetInsertPoint();
+        IRBuilderBase::InsertPoint call_site = builder->saveIP();
         llvm::Function* stripmine = add_stripmine_loop(loop->body, loop->name,
                                                        closure_args,
                                                        arg_types);
-        builder->SetInsertPoint(curr_block, curr_point);
+        builder->restoreIP(call_site);
 
         Value* min    = builder->CreateIntCast(codegen(loop->min), i64_t, true);
         Value* extent = builder->CreateIntCast(codegen(loop->extent), i64_t, true);
@@ -373,7 +375,8 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
         for (size_t i = 1 ; i < closure_args.size(); i++) {
           args.push_back(sym_get(closure_args[i].name));
         }
-        Value* consumed = builder->CreateCall(stripmine, args);
+        llvm::CallInst* consumed = builder->CreateCall(stripmine, args);
+        consumed->setIsNoInline();
 
         // Update the counter
         Value* next_var = builder->CreateNSWAdd(phi, consumed);
