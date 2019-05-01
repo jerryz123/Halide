@@ -145,8 +145,6 @@ llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
                                                                   const std::string &name,
                                                                   std::vector<DeviceArgument> args,
                                                                   std::vector<llvm::Type*> arg_types) {
-    std::cout << "In add_stripmine\n";
-
     llvm::Function* oldFunction = function;
 
     FunctionType *func_t = FunctionType::get(void_t, arg_types, false);
@@ -203,8 +201,6 @@ llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
 
     // Now verify the function is ok
     verifyFunction(*function);
-
-    std::cout << "Done generating llvm bitcode for Hwacha\n";
 
     // Clear the symbol table
     for (size_t i = 0; i < arg_sym_names.size(); i++) {
@@ -303,7 +299,7 @@ void CodeGen_GPU_Host<CodeGen_CPU>::compile_func(const LoweredFunc &f,
 
 template<typename CodeGen_CPU>
 void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
-    if (CodeGen_GPU_Dev::is_gpu_var(loop->name) && loop->device_api == DeviceAPI::Default_GPU) {
+    if (CodeGen_GPU_Dev::is_gpu_var(loop->name) && loop->device_api == DeviceAPI::Host) {
       if (ends_with(loop->name, "__block_id_x")) {
         internal_assert(target.has_feature(Target::Hwacha)) << "Must support hwacha\n";
         internal_assert(ends_with(loop->name, "__block_id_x")) << "Not supported variable " << loop->name << "\n";

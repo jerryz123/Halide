@@ -702,7 +702,7 @@ Target Target::without_feature(Feature f) const {
 }
 
 bool Target::has_gpu_feature() const {
-    return has_feature(CUDA) || has_feature(OpenCL) || has_feature(Metal) || has_feature(D3D12Compute);
+    return has_feature(CUDA) || has_feature(OpenCL) || has_feature(Metal) || has_feature(D3D12Compute) || has_feature(Hwacha);
 }
 
 bool Target::supports_type(const Type &t) const {
