@@ -147,7 +147,7 @@ llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
                                                                   std::vector<llvm::Type*> arg_types) {
     llvm::Function* oldFunction = function;
 
-    FunctionType *func_t = FunctionType::get(void_t, arg_types, false);
+    FunctionType *func_t = FunctionType::get(i64_t, arg_types, false);
     function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, name, nullptr);
     function->addFnAttr(Attribute::NoInline);
 
@@ -195,7 +195,7 @@ llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
     stmt.accept(this);
 
     // Now we need to end the function
-    builder->CreateRetVoid();
+    builder->CreateRet(sym_get(args[0].name));
 
     module->getFunctionList().push_front(function);
 
@@ -321,6 +321,7 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
 
         // Determine the arguments that must be passed to Hwacha through vmcs/vmca
         vector<DeviceArgument> closure_args = c.arguments();
+        closure_args.insert(closure_args.begin(), DeviceArgument("vl", false, UInt(64), 0));
 
         for (size_t i = 0; i < closure_args.size(); i++) {
             if (closure_args[i].is_buffer && allocations.contains(closure_args[i].name)) {
@@ -346,10 +347,11 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
         builder->SetInsertPoint(curr_block, curr_point);
 
         std::vector<llvm::Value*> args;
-        for (size_t i = 0 ; i < closure_args.size(); i++) {
+        args.push_back(codegen(Expr(cast<uint64_t>(0))));
+        for (size_t i = 1 ; i < closure_args.size(); i++) {
           args.push_back(sym_get(closure_args[i].name));
         }
-        builder->CreateCall(stripmine, args);
+       d builder->CreateCall(stripmine, args);
       } else if (ends_with(loop->name, "__thread_id_x")) {
         codegen(loop->body);
       }
