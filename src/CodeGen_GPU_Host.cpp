@@ -165,7 +165,6 @@ llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
       }
     }
 
-
     // Put the arguments in the symbol table
     vector<string> arg_sym_names;
     {
@@ -180,7 +179,6 @@ llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
         i++;
       }
     }
-
 
     // We won't end the entry block yet, because we'll want to add
     // some allocas to it later if there are local allocations. Start
@@ -346,12 +344,49 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
                                                        arg_types);
         builder->SetInsertPoint(curr_block, curr_point);
 
+        Value* min    = builder->CreateIntCast(codegen(loop->min), i64_t, true);
+        Value* extent = builder->CreateIntCast(codegen(loop->extent), i64_t, true);
+        Value* max    = builder->CreateNSWAdd(min, extent);
+        BasicBlock* preheader_bb = builder->GetInsertBlock();
+
+        // Make a new basic block for the loop
+        BasicBlock *loop_bb  = BasicBlock::Create(*context, std::string("for ") + loop->name, function);
+        // Create the block that comes after the loop
+        BasicBlock *after_bb = BasicBlock::Create(*context, std::string("end for ") + loop->name, function);
+
+        // If min < max, fall through to the loop bb
+        Value *enter_condition = builder->CreateICmpSLT(min, max);
+        builder->CreateCondBr(enter_condition, loop_bb, after_bb);
+        builder->SetInsertPoint(loop_bb);
+
+        // Make our phi node.
+        PHINode *phi = builder->CreatePHI(i64_t, 2);
+        phi->addIncoming(min, preheader_bb);
+
+        // Within the loop, the variable is equal to the phi value
+        sym_push(loop->name, phi);
+
+        // Call our stripmine function
+        Value* remaining = builder->CreateNSWSub(max, phi);
         std::vector<llvm::Value*> args;
-        args.push_back(codegen(Expr(cast<uint64_t>(0))));
+        args.push_back(remaining);
         for (size_t i = 1 ; i < closure_args.size(); i++) {
           args.push_back(sym_get(closure_args[i].name));
         }
-       d builder->CreateCall(stripmine, args);
+        Value* consumed = builder->CreateCall(stripmine, args);
+
+        // Update the counter
+        Value* next_var = builder->CreateNSWAdd(phi, consumed);
+
+        // Add the back-edge to the phi node
+        phi->addIncoming(next_var, builder->GetInsertBlock());
+
+        // Maybe exit the loop
+        Value* end_condition = builder->CreateICmpNE(next_var, max);
+        builder->CreateCondBr(end_condition, loop_bb, after_bb);
+
+        builder->SetInsertPoint(after_bb);
+        sym_pop(loop->name);
       } else if (ends_with(loop->name, "__thread_id_x")) {
         codegen(loop->body);
       }
