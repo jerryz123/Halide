@@ -140,89 +140,7 @@ CodeGen_GPU_Host<CodeGen_CPU>::~CodeGen_GPU_Host() {
     }
 }
 
-template<typename CodeGen_CPU>
-llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
-                                                                  const std::string &name,
-                                                                  std::vector<DeviceArgument> args,
-                                                                  std::vector<llvm::Type*> arg_types) {
-    llvm::Function* oldFunction = function;
 
-    string kernel_name = unique_name("kernel_" + name);
-    for (size_t i = 0; i < kernel_name.size(); i++) {
-      if (!isalnum(kernel_name[i])) {
-        kernel_name[i] = '_';
-      }
-    }
-
-
-
-    FunctionType *func_t = FunctionType::get(i64_t, arg_types, false);
-    function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, kernel_name, nullptr);
-    function->addFnAttr(Attribute::NoInline);
-    function->addFnAttr(Attribute::OptimizeNone);
-
-
-    llvm::Metadata *md_args[] = {
-      llvm::ValueAsMetadata::get(function)
-    };
-    llvm::MDNode *md_node = llvm::MDNode::get(*context, md_args);
-    module->getOrInsertNamedMetadata("opencl.kernels")->addOperand(md_node);
-
-    // Mark the buffer args as no alias
-    for (size_t i = 0; i < args.size(); i++) {
-      if (args[i].is_buffer) {
-        function->addParamAttr(i, Attribute::NoAlias);
-      }
-    }
-
-    // Put the arguments in the symbol table
-    vector<string> arg_sym_names;
-    {
-      size_t i = 0;
-      for (auto &fn_arg : function->args()) {
-
-        string arg_sym_name = args[i].name;
-        sym_push(arg_sym_name, &fn_arg);
-        fn_arg.setName(arg_sym_name);
-        arg_sym_names.push_back(arg_sym_name);
-
-        i++;
-      }
-    }
-
-    // We won't end the entry block yet, because we'll want to add
-    // some allocas to it later if there are local allocations. Start
-    // a new block to put all the code.
-    BasicBlock *body_block = BasicBlock::Create(*context, "body", function);
-    builder->SetInsertPoint(body_block);
-
-    // Ok, we have a module, function, context, and a builder
-    // pointing at a brand new basic block. We're good to go.
-    Expr simt_idx = Cast::make(Int(32), Call::make(Int(64), "llvm.hwacha.veidx", std::vector<Expr>(), Call::Extern));
-    sym_push(name, codegen(simt_idx));
-    stmt.accept(this);
-
-    // Now we need to end the function
-    builder->CreateRet(sym_get(args[0].name));
-
-    module->getFunctionList().push_front(function);
-
-    // Now verify the function is ok
-    verifyFunction(*function);
-
-    // Clear the symbol table
-    for (size_t i = 0; i < arg_sym_names.size(); i++) {
-      sym_pop(arg_sym_names[i]);
-    }
-    sym_pop(name);
-
-    llvm::Function* r = function;
-    function = oldFunction;
-
-    return r;
-}
-
-  
 template<typename CodeGen_CPU>
 void CodeGen_GPU_Host<CodeGen_CPU>::compile_func(const LoweredFunc &f,
                                                  const std::string &simple_name,
@@ -305,6 +223,91 @@ void CodeGen_GPU_Host<CodeGen_CPU>::compile_func(const LoweredFunc &f,
 
 }
 
+
+template<typename CodeGen_CPU>
+llvm::Function* CodeGen_GPU_Host<CodeGen_CPU>::add_stripmine_loop(Stmt stmt,
+                                                                  const std::string &name,
+                                                                  std::vector<DeviceArgument> args,
+                                                                  std::vector<llvm::Type*> arg_types) {
+    llvm::Function* oldFunction = function;
+
+    string kernel_name = unique_name("kernel_" + name);
+    for (size_t i = 0; i < kernel_name.size(); i++) {
+      if (!isalnum(kernel_name[i])) {
+        kernel_name[i] = '_';
+      }
+    }
+
+
+
+    FunctionType *func_t = FunctionType::get(i64_t, arg_types, false);
+    function = llvm::Function::Create(func_t, llvm::Function::ExternalLinkage, kernel_name, nullptr);
+    function->addFnAttr(Attribute::NoInline);
+    function->addFnAttr(Attribute::OptimizeNone);
+
+
+    llvm::Metadata *md_args[] = {
+      llvm::ValueAsMetadata::get(function)
+    };
+    llvm::MDNode *md_node = llvm::MDNode::get(*context, md_args);
+    module->getOrInsertNamedMetadata("opencl.kernels")->addOperand(md_node);
+
+    // Mark the buffer args as no alias
+    for (size_t i = 0; i < args.size(); i++) {
+      if (args[i].is_buffer) {
+        function->addParamAttr(i, Attribute::NoAlias);
+      }
+    }
+
+    // Put the arguments in the symbol table
+    vector<string> arg_sym_names;
+    {
+      size_t i = 0;
+      for (auto &fn_arg : function->args()) {
+
+        string arg_sym_name = args[i].name;
+        sym_push(arg_sym_name, &fn_arg);
+        fn_arg.setName(arg_sym_name);
+        arg_sym_names.push_back(arg_sym_name);
+
+        i++;
+      }
+    }
+
+    // We won't end the entry block yet, because we'll want to add
+    // some allocas to it later if there are local allocations. Start
+    // a new block to put all the code.
+    BasicBlock *body_block = BasicBlock::Create(*context, "body", function);
+    builder->SetInsertPoint(body_block);
+
+    // Ok, we have a module, function, context, and a builder
+    // pointing at a brand new basic block. We're good to go.
+    Value* veidx = builder->CreateNSWAdd(codegen(Call::make(Int(64), "llvm.hwacha.veidx", std::vector<Expr>(), Call::Extern)), sym_get("consumed"));
+    //    Value* veidx_32 = builder->CreateIntCast(builder->CreateNSWAdd(veidx, sym_get("consumed")), i64_t, true);
+    sym_push(name, veidx);
+    stmt.accept(this);
+
+    // Now we need to end the function
+    builder->CreateRet(sym_get(args[0].name));
+
+    module->getFunctionList().push_front(function);
+
+    // Now verify the function is ok
+    verifyFunction(*function);
+
+    // Clear the symbol table
+    for (size_t i = 0; i < arg_sym_names.size(); i++) {
+      sym_pop(arg_sym_names[i]);
+    }
+    sym_pop(name);
+
+    llvm::Function* r = function;
+    function = oldFunction;
+
+    return r;
+}
+
+
 template<typename CodeGen_CPU>
 void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
     if (CodeGen_GPU_Dev::is_gpu_var(loop->name) && loop->device_api == DeviceAPI::Host) {
@@ -321,14 +324,17 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
         HostClosure c(loop->body, loop->name);
 
         // Determine the arguments that must be passed to Hwacha through vmcs/vmca
-        vector<DeviceArgument> closure_args = c.arguments();
-        closure_args.insert(closure_args.begin(), DeviceArgument("vl", false, UInt(64), 0));
-
+        vector<DeviceArgument> closure_args;
+        closure_args.push_back(DeviceArgument("vl", false, UInt(64), 0));
+        closure_args.push_back(DeviceArgument("consumed", false, UInt(64), 0));
+        for (auto a: c.arguments())
+          closure_args.push_back(a);
         for (size_t i = 0; i < closure_args.size(); i++) {
             if (closure_args[i].is_buffer && allocations.contains(closure_args[i].name)) {
                 closure_args[i].size = allocations.get(closure_args[i].name).constant_bytes;
             }
         }
+
 
         // Now deduce the types of the arguments to our function
         vector<llvm::Type *> arg_types(closure_args.size());
@@ -361,18 +367,19 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
         builder->CreateCondBr(enter_condition, loop_bb, after_bb);
         builder->SetInsertPoint(loop_bb);
 
-        // Make our phi node.
+        // Make our phi nodes.
         PHINode *phi = builder->CreatePHI(i64_t, 2);
         phi->addIncoming(min, preheader_bb);
 
-        // Within the loop, the variable is equal to the phi value
-        sym_push(loop->name, phi);
+        // // Within the loop, the variable is equal to the phi value
+        // sym_push(loop->name, phi);
 
         // Call our stripmine function
         Value* remaining = builder->CreateNSWSub(max, phi);
         std::vector<llvm::Value*> args;
         args.push_back(remaining);
-        for (size_t i = 1 ; i < closure_args.size(); i++) {
+        args.push_back(phi);
+        for (size_t i = 2 ; i < closure_args.size(); i++) {
           args.push_back(sym_get(closure_args[i].name));
         }
         llvm::CallInst* consumed = builder->CreateCall(stripmine, args);
@@ -389,7 +396,9 @@ void CodeGen_GPU_Host<CodeGen_CPU>::visit(const For *loop) {
         builder->CreateCondBr(end_condition, loop_bb, after_bb);
 
         builder->SetInsertPoint(after_bb);
-        sym_pop(loop->name);
+        builder->CreateFence(llvm::AtomicOrdering::SequentiallyConsistent);
+        //        sym_pop(loop->name);
+
       } else if (ends_with(loop->name, "__thread_id_x")) {
         codegen(loop->body);
       }
